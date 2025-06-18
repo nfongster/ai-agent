@@ -1,6 +1,7 @@
 import os, sys
 from dotenv import load_dotenv
 from google import genai
+from google.genai import types
 
 load_dotenv()
 api_key = os.environ.get("GEMINI_API_KEY")
@@ -11,8 +12,13 @@ if len(args) < 2:
     sys.exit("Too few args were provided.  Please provide a prompt, in quotes, as an argument.")
 prompt = args[1]
 
+messages = [
+    types.Content(role="User", parts=[types.Part(text=user_prompt)]),
+]
+
 response = client.models.generate_content(
-    model='gemini-2.0-flash-001', contents=prompt
+    model='gemini-2.0-flash-001',
+    contents=messages,
 )
 
 print(f"Response:\n\n{response.text}")
