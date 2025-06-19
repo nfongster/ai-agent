@@ -1,5 +1,5 @@
 from pathlib import Path
-import os
+import os, subprocess
 
 # Max number of characters to read from a file
 MAX_CHARS = 10000
@@ -23,7 +23,7 @@ is_dir={os.path.isdir(os.path.join(sub_dir_path, item))}'
         )
     
     except Exception as e:
-        print(f'Error: {e}')
+        return f'Error: {e}'
 
 
 def get_file_content(working_directory, file_path):
@@ -43,7 +43,7 @@ def get_file_content(working_directory, file_path):
             return file_content_string
 
     except Exception as e:
-        print(f'Error: {e}')
+        return f'Error: {e}'
 
 
 def write_file(working_directory, file_path, content):
@@ -58,8 +58,34 @@ def write_file(working_directory, file_path, content):
         
         with open(file_abs_path, 'w') as f:
             f.write(content)
-        
+
         return f'Successfully wrote to "{file_path}" ({len(content)} characters written)'
         
     except Exception as e:
-        print(f'Error: {e}')
+        return f'Error: {e}'
+
+
+def run_python_file(working_directory, file_path):
+    try:
+        working_dir_abs_path = os.path.abspath(working_directory)
+        file_abs_path = os.path.abspath(os.path.join(working_dir_abs_path, file_path))
+
+        if not file_abs_path.startswith(working_dir_abs_path):
+            return f'Error: Cannot execute "{file_path}" as it is outside the permitted working directory'
+        if not os.path.exists(file_abs_path):
+            return f'Error: File "{file_path}" not found.'
+        _, extension = os.path.splitext(file_path)
+        if extension != ".py":
+            return f'Error: "{file_path}" is not a Python file.'
+        
+        process = subprocess.run([file_abs_path], timeout=30)
+        stdout, stderr, code = process.stdout, process.stderr, process.check_returncode()
+        if not stdout:
+            return "No output produced."
+        output = f'STDOUT:{stdout}, STDERR:{stderr}'
+        if code != 0:
+            output += f', Process exited with code {code}'
+        return output
+    
+    except Exception as e:
+        return f'Error: {e}'
