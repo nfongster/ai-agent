@@ -133,10 +133,12 @@ available_functions = types.Tool(
     ]
 )
 
-system_prompt = """
+system_prompt = f"""
 You are a helpful AI coding agent.
 
-When a user asks a question or makes a request, make a function call plan. You can perform the following operations:
+When a user asks a question or makes a request, make a function call plan.  If the prompt requires you to run and/or modify files, start by looking in the pkg folder.
+
+You can perform the following operations:
 
 - List files and directories
 - Read file contents
@@ -146,28 +148,42 @@ When a user asks a question or makes a request, make a function call plan. You c
 All paths you provide should be relative to the working directory. You do not need to specify the working directory in your function calls as it is automatically injected for security reasons.
 """
 
-response = client.models.generate_content(
-    model='gemini-2.0-flash-001',
-    contents=messages,
-    config=types.GenerateContentConfig(
-        tools=[available_functions], system_instruction=system_prompt
-    ),
-)
+# system_prompt = """
+# Write a sentence that has the same number of words as my prompt, such that each word is different than the prompt word, but has the same first letter as the corresponding prompt word.
+# """
 
-if response.function_calls:
-    for function_call_part in response.function_calls:
-        print(f"Calling function: {function_call_part.name}({function_call_part.args})")
-        content = call_function(function_call_part, verbose)
-        content_response = content.parts[0].function_response.response
-        if not content_response:
-            raise Exception("Function did not have a response!")
-        elif verbose:
-            print(f"-> {content_response}")
-else:
-    print(f"Response:\n\n{response.text}")
+iter = 0
+while iter < 20:
 
-prompt_tokens, response_tokens = response.usage_metadata.prompt_token_count, response.usage_metadata.candidates_token_count
+    response = client.models.generate_content(
+        model='gemini-2.0-flash-001',
+        contents=messages,
+        config=types.GenerateContentConfig(
+            tools=[available_functions], system_instruction=system_prompt
+        ),
+    )
 
-if verbose:
-    print(f"Prompt tokens: {prompt_tokens}")
-    print(f"Response tokens: {response_tokens}")
+    for candidate in response.candidates:
+        messages.append(candidate.content)
+
+    if response.function_calls:
+        for function_call_part in response.function_calls:
+            print(f"Calling function: {function_call_part.name}({function_call_part.args})")
+            content = call_function(function_call_part, verbose)
+            messages.append(content)
+            content_response = content.parts[0].function_response.response
+            if not content_response:
+                raise Exception("Function did not have a response!")
+            elif verbose:
+                print(f"-> {content_response}")
+    else:  # If no function was called, print final response and break loop
+        print(response.text)
+        break
+
+    prompt_tokens, response_tokens = response.usage_metadata.prompt_token_count, response.usage_metadata.candidates_token_count
+
+    if verbose:
+        print(f"Prompt tokens: {prompt_tokens}")
+        print(f"Response tokens: {response_tokens}")
+
+    iter += 1
