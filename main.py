@@ -2,6 +2,7 @@ import os, sys
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
+from functions import get_files_info
 
 load_dotenv()
 api_key = os.environ.get("GEMINI_API_KEY")
@@ -33,9 +34,58 @@ schema_get_files_info = types.FunctionDeclaration(
     ),
 )
 
+schema_get_file_content = types.FunctionDeclaration(
+    name="get_file_content",
+    description=f"Gets the contents of a specified file in the specified working directory, limited to {get_files_info.MAX_CHARS} characters.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="The path to the file whose contents will be returned."
+            )
+        }
+    )
+)
+
+schema_run_python_file = types.FunctionDeclaration(
+    name="run_python_file",
+    description=f"Runs a specified Python file.  Returns an error if the file is not a Python file.  Note that this may require permissions.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="The path to the Python file."
+            )
+        }
+    )
+)
+
+schema_write_file = types.FunctionDeclaration(
+    name="write_file",
+    description=f"Writes specified content to a file, creating a new file if it does not exist.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "file_path": types.Schema(
+                type=types.Type.STRING,
+                description="The path to the file."
+            ),
+            "content": types.Schema(
+                type=types.Type.STRING,
+                description="The content to be written to the file."
+            )
+        }
+    )
+)
+
 available_functions = types.Tool(
     function_declarations=[
         schema_get_files_info,
+        schema_get_file_content,
+        schema_run_python_file,
+        schema_write_file
     ]
 )
 
@@ -45,6 +95,9 @@ You are a helpful AI coding agent.
 When a user asks a question or makes a request, make a function call plan. You can perform the following operations:
 
 - List files and directories
+- Read file contents
+- Execute Python files with optional arguments
+- Write or overwrite files
 
 All paths you provide should be relative to the working directory. You do not need to specify the working directory in your function calls as it is automatically injected for security reasons.
 """
