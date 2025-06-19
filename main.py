@@ -2,7 +2,51 @@ import os, sys
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
-from functions import get_files_info
+from functions import get_files_info as tools
+
+
+WORKING_DIR = "./calculator"
+
+
+def call_function(function_call_part, verbose=False):
+    if verbose:
+        print(f"Calling function: {function_call_part.name}({function_call_part.args})")
+    else:
+        print(f" - Calling function: {function_call_part.name}")
+
+    function_name, args = function_call_part.name, function_call_part.args
+    args["working_directory"] = WORKING_DIR
+    function_result = ""
+    match function_name:
+        case "get_files_info":
+            function_result = tools.get_files_info(**args)
+        case "get_file_content":
+            function_result = tools.get_file_content(**args)
+        case "write_file":
+            function_result = tools.write_file(**args)
+        case "run_python_file":
+            function_result = tools.run_python_file(**args)
+        case _:
+            return types.Content(
+                role="tool",
+                parts=[
+                    types.Part.from_function_response(
+                        name=function_name,
+                        response={"error": f"Unknown function: {function_name}"},
+                    )
+                ],
+            )
+    
+    return types.Content(
+        role="tool",
+        parts=[
+            types.Part.from_function_response(
+                name=function_name,
+                response={"result": function_result},
+            )
+        ],
+    )
+
 
 load_dotenv()
 api_key = os.environ.get("GEMINI_API_KEY")
@@ -36,7 +80,7 @@ schema_get_files_info = types.FunctionDeclaration(
 
 schema_get_file_content = types.FunctionDeclaration(
     name="get_file_content",
-    description=f"Gets the contents of a specified file in the specified working directory, limited to {get_files_info.MAX_CHARS} characters.",
+    description=f"Gets the contents of a specified file in the specified working directory, limited to {tools.MAX_CHARS} characters.",
     parameters=types.Schema(
         type=types.Type.OBJECT,
         properties={
@@ -113,6 +157,12 @@ response = client.models.generate_content(
 if response.function_calls:
     for function_call_part in response.function_calls:
         print(f"Calling function: {function_call_part.name}({function_call_part.args})")
+        content = call_function(function_call_part, verbose)
+        content_response = content.parts[0].function_response.response
+        if not content_response:
+            raise Exception("Function did not have a response!")
+        elif verbose:
+            print(f"-> {content_response}")
 else:
     print(f"Response:\n\n{response.text}")
 
